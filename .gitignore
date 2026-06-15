@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build output
+out/
+dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Runtime
+workspace/
+config.json
+tdbot.db
+*.log
+
+# Environment
+.env
+.env.local
+
+# TypeScript
+*.tsbuildinfo

@@ -1,0 +1,75 @@
+{
+  "name": "tdbot",
+  "version": "1.0.0",
+  "description": "桌面智能体 - 基于 opencode SDK",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "dist": "electron-vite build && electron-builder",
+    "dist:win": "electron-vite build && electron-builder --win --dir"
+  },
+  "build": {
+    "appId": "com.tidubot.app",
+    "productName": "梯度小助手",
+    "icon": "resources/icon.png",
+    "directories": {
+      "output": "dist"
+    },
+    "linux": {
+      "extraResources": [
+        { "from": "node_modules/opencode-ai/bin/opencode.exe", "to": "opencode" },
+        { "from": "resources/weknora-mcp.js", "to": "weknora-mcp.js" }
+      ],
+      "target": ["AppImage"],
+      "category": "Utility"
+    },
+    "win": {
+      "extraResources": [
+        { "from": "node_modules/opencode-ai/bin/opencode.exe", "to": "opencode.exe" },
+        { "from": "resources/weknora-mcp.js", "to": "weknora-mcp.js" }
+      ],
+      "target": ["dir", "nsis"],
+      "icon": "resources/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.16",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.7.0",
+    "autoprefixer": "^10.5.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^26.8.1",
+    "electron-vite": "^5.0.0",
+    "postcss": "^8.5.15",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^6.0.3",
+    "vite": "^6.4.3"
+  },
+  "dependencies": {
+    "@opencode-ai/sdk": "^1.15.0",
+    "@radix-ui/react-avatar": "^1.1.11",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-scroll-area": "^1.2.10",
+    "@radix-ui/react-separator": "^1.1.8",
+    "@radix-ui/react-tooltip": "^1.2.8",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "highlight.js": "^11.11.1",
+    "js-yaml": "^4.2.0",
+    "lucide-react": "^1.17.0",
+    "opencode-ai": "^1.16.2",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-markdown": "^10.1.0",
+    "rehype-highlight": "^7.0.2",
+    "remark-gfm": "^4.0.1",
+    "sql.js": "^1.14.1",
+    "tailwind-merge": "^3.6.0"
+  }
+}
