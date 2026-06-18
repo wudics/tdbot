@@ -107,6 +107,11 @@ async function createWindow() {
     },
   })
 
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url).catch(() => {})
+    return { action: 'deny' }
+  })
+
   if (process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -427,6 +432,10 @@ app.whenReady().then(async () => {
     }
   })
 
+  ipcMain.handle('open-external', async (_event, url: string) => {
+    await shell.openExternal(url)
+  })
+
   ipcMain.handle('set-workspace-path', async () => {
     const result = await dialog.showOpenDialog(mainWindow!, {
       properties: ['openDirectory'],
@@ -609,6 +618,24 @@ app.whenReady().then(async () => {
     }
   })
 
+  ipcMain.handle('reply-question', async (_event, id: string, text: string) => {
+    if (!opencodeReady) return
+    try {
+      await opencodeClient.question.reply({ requestID: id, answers: [[text]] })
+    } catch (err) {
+      console.error('reply-question error:', err)
+    }
+  })
+
+  ipcMain.handle('reject-question', async (_event, id: string) => {
+    if (!opencodeReady) return
+    try {
+      await opencodeClient.question.reject({ requestID: id })
+    } catch (err) {
+      console.error('reject-question error:', err)
+    }
+  })
+
   // 发送消息
   ipcMain.handle('send-message', async (_event, text: string, sessionId: string, system?: string, parts?: any[]) => {
     if (!opencodeReady || !sessionId) {
@@ -666,11 +693,38 @@ app.whenReady().then(async () => {
                 partTypes[part.id] = part.type
                 if (part.type === 'tool') {
                   mainWindow?.webContents.send('stream-tool', {
+                    callID: part.id,
                     tool: part.tool,
                     status: part.state?.status,
                     input: part.state?.input,
-                    output: part.state?.output,
+                    output: part.state?.output || '',
                     title: part.state?.title,
+                    error: part.state?.error,
+                    progress: part.state?.progress,
+                  })
+                }
+                if (part.type === 'file') {
+                  mainWindow?.webContents.send('stream-file', {
+                    id: part.id,
+                    mediaType: part.mediaType || '',
+                    filename: part.filename || '',
+                    url: part.url || '',
+                  })
+                }
+                if (part.type === 'subtask') {
+                  mainWindow?.webContents.send('stream-subtask', {
+                    id: part.id,
+                    description: part.description || '',
+                    agent: part.agent || '',
+                    prompt: part.prompt || '',
+                  })
+                }
+                if (part.type === 'step-finish') {
+                  mainWindow?.webContents.send('stream-step-finish', {
+                    id: part.id,
+                    reason: part.reason || '',
+                    cost: part.cost || 0,
+                    tokens: part.tokens || {},
                   })
                 }
               }
@@ -698,6 +752,16 @@ app.whenReady().then(async () => {
                 action: props.permission,
                 resources: props.patterns || [],
               })
+            }
+            if (event.type === 'question.asked') {
+              const props = (event as any).properties
+  mainWindow?.webContents.send('stream-question', {
+                id: props.id,
+                questions: props.questions || [],
+              })
+            }
+            if (event.type === 'session.status') {
+              mainWindow?.webContents.send('stream-session-status', (event as any).properties)
             }
           }
         } catch (streamErr: any) {

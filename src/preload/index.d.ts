@@ -51,6 +51,7 @@ export interface Api {
   getWorkspacePath: () => Promise<string>
   setWorkspacePath: () => Promise<{ success: boolean; path?: string }>
   openWorkspaceFolder: () => Promise<void>
+  openExternal: (url: string) => Promise<void>
   loadAgents: () => Promise<AgentData[]>
   saveAgents: (agents: AgentData[]) => Promise<void>
   loadMcp: () => Promise<any[]>
@@ -62,10 +63,17 @@ export interface Api {
   onStream: (callback: (data: { delta: string; partType: string }) => void) => void
   onEnd: (callback: () => void) => void
   onError: (callback: (error: any) => void) => void
-  onTool: (callback: (data: { tool: string; status: string; input: any; output?: string; title?: string }) => void) => void
+  onTool: (callback: (data: { callID: string; tool: string; status: string; input: any; output?: string; title?: string; error?: string; progress?: { structured?: Record<string, any>; content?: { type: string; text?: string; uri?: string }[] } }) => void) => void
+  onFile: (callback: (data: { id: string; mediaType: string; filename: string; url: string }) => void) => void
+  onSubtask: (callback: (data: { id: string; description: string; agent: string; prompt: string }) => void) => void
+  onStepFinish: (callback: (data: { id: string; reason: string; cost: number; tokens: any }) => void) => void
   onConnectionStatus: (callback: (status: string) => void) => void
   replyPermission: (id: string, reply: 'once' | 'always' | 'reject') => void
   onPermission: (callback: (data: { id: string; action: string; resources: string[] }) => void) => void
+  replyQuestion: (id: string, text: string) => void
+  rejectQuestion: (id: string) => void
+  onQuestion: (callback: (data: { id: string; questions: { question: string; header: string; options: { label: string; description: string }[]; custom?: boolean; multiple?: boolean }[] }) => void) => void
+  onSessionStatus: (callback: (data: { sessionID: string; status: { type: string; attempt?: number; message?: string; next?: number } }) => void) => void
 }
 
 declare global {

@@ -27,3 +27,6 @@ tdbot.db
 
 # TypeScript
 *.tsbuildinfo
+
+# Document
+docs/opencode-src/

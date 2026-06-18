@@ -171,7 +171,7 @@ AI 基于知识库内容 + 用户问题回复
 | `src/main/configStore.ts` | 修改 | `AppConfig` 新增 `weknoraUrl: string` / `weknoraApiKey: string` |
 | `src/main/index.ts` | 修改 | 新增 `search-weknora` IPC（调用 WeKnora API 检索，取前 5 条）；新增 `list-weknora-kbs` IPC（调用 `GET /knowledge-bases` 获取列表）；`send-message` 内部根据 `weknoraKbIds` 参数判断是否拼接检索上下文 |
 | `src/renderer/src/components/SettingsDialog.tsx` | 修改 | 新增 WeKnora 配置区域（URL + API Key 两输入框） |
-| `src/renderer/src/components/ChatView.tsx` | 修改 | 工具栏新增 📚 知识库选择器下拉框（`weknoraConfigured` 控制显隐，`onFocus` 异步加载，加载中/失败状态） |
+| `src/renderer/src/components/ChatView.tsx` | 修改 | 工具栏新增 📚 知识库选择器下拉框（`weknoraConfigured` 控制显隐，`onFocus` 异步加载，加载中/失败状态）；弹出框使用 `bg-white` 白色背景 |
 | `src/renderer/src/App.tsx` | 修改 | 新增 `weknoraConfigured` / `weknoraKbs` / `weknoraKbIds` 状态管理 |
 | `src/renderer/src/hooks/useChat.ts` | 修改 | `sendMessage` 接受 `weknoraKbIds` 参数传递给 IPC |
 | `src/preload/index.ts` | 修改 | 新增 `searchWeknora` / `listWeknoraKbs` IPC |

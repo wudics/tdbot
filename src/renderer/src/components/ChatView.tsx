@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useChat } from '../hooks/useChat'
+import { useAutoScroll } from '../hooks/useAutoScroll'
 import MessageItem from './MessageItem'
 import InputBar from './InputBar'
 import PermissionCard from './PermissionCard'
-import { ScrollArea } from './ui/scroll-area'
+import QuestionCard from './QuestionCard'
+
 import { Button } from './ui/button'
 import { Menu, Plus, RefreshCw } from 'lucide-react'
 import { getVariantLabel, capabilityIcons } from '../lib/variants'
@@ -30,8 +32,34 @@ interface ChatViewProps {
 }
 
 export default function ChatView({ onOpenSidebar, sessionId, onNewSession, initialMessages = [], onAutoTitle, onStreamingChange, providers, activeProvider, activeModel, onModelChange, agents, activeAgent, onAgentChange, weknoraConfigured, availableProviders, availableModels, thinkingDepth, onThinkingDepthChange }: ChatViewProps) {
-  const { messages, permissions, isLoading, sendMessage, abort, replyPermission, loadMessages, setSessionId, clearMessages } = useChat(onAutoTitle)
+  const { messages, permissions, questions, isLoading, sessionStatus, sendMessage, abort, replyPermission, replyQuestion, rejectQuestion, loadMessages, setSessionId, clearMessages } = useChat(onAutoTitle)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const navRef = useRef<HTMLDivElement>(null)
+  const dragRef = useRef<{ startY: number; scrollTop: number } | null>(null)
+  const scrollBtnRef = useRef<HTMLButtonElement>(null)
+  const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null)
+
+  const scrollToBottom = useCallback(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+  }, [])
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    let near = true
+    const check = () => {
+      const newNear = el.scrollHeight - el.scrollTop - el.clientHeight < 300
+      if (newNear !== near) {
+        near = newNear
+        if (scrollBtnRef.current) {
+          scrollBtnRef.current.style.display = near ? 'none' : ''
+        }
+      }
+    }
+    el.addEventListener('scroll', check, { passive: true })
+    return () => el.removeEventListener('scroll', check)
+  }, [])
+
   const [webInfo, setWebSearch] = useState(false)
   const [weknoraKbs, setWeknoraKbs] = useState<{ id: string; name: string }[]>([])
   const [weknoraKbIds, setWeknoraKbIds] = useState<string[]>([])
@@ -66,11 +94,13 @@ export default function ChatView({ onOpenSidebar, sessionId, onNewSession, initi
     }
   }, [sessionId])
 
+  useAutoScroll(scrollRef, [messages])
+
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    if (isLoading) {
+      scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight)
     }
-  }, [messages])
+  }, [isLoading])
 
   useEffect(() => {
     onStreamingChange?.(isLoading)
@@ -127,8 +157,8 @@ export default function ChatView({ onOpenSidebar, sessionId, onNewSession, initi
       const ids = weknoraKbIds.join(', ')
       system = `用户已选择以下知识库：${names}（ID: ${ids}）\n如需要查询知识库获取信息，请使用 weknora_search 工具，并传入对应的知识库 ID。`
     }
-    sendMessage(text, system || undefined, files)
-  }, [weknoraKbIds, weknoraKbs, sendMessage])
+    sendMessage(text, system || undefined, files, activeAgent)
+  }, [weknoraKbIds, weknoraKbs, activeAgent, sendMessage])
 
   const toggleSearch = () => {
     const next = !webInfo
@@ -140,12 +170,19 @@ export default function ChatView({ onOpenSidebar, sessionId, onNewSession, initi
 
   if (!sessionId) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground gap-4">
-        <p>选择一个对话或创建新对话</p>
-        <Button variant="default" onClick={onNewSession}>
-          <Plus className="h-4 w-4 mr-2" />
-          新建对话
-        </Button>
+      <div className="flex-1 flex flex-col min-h-0 relative">
+        <div className="flex items-center p-2 md:hidden">
+          <Button variant="ghost" size="sm" onClick={onOpenSidebar}>
+            <Menu className="h-5 w-5" />
+          </Button>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground gap-4">
+          <p>选择一个对话或创建新对话</p>
+          <Button variant="default" onClick={onNewSession}>
+            <Plus className="h-4 w-4 mr-2" />
+            新建对话
+          </Button>
+        </div>
       </div>
     )
   }
@@ -158,16 +195,66 @@ export default function ChatView({ onOpenSidebar, sessionId, onNewSession, initi
         </Button>
         <div className="flex-1" />
       </div>
-      <ScrollArea className="flex-1 border rounded-lg p-4 min-h-0 overflow-y-auto" ref={scrollRef}>
-        {messages.length === 0 && (
-          <p className="text-center text-muted-foreground mt-20">
-            输入消息开始对话
-          </p>
-        )}
-        {messages.map(msg => (
-          <MessageItem key={msg.id} message={msg} isStreaming={isLoading} />
-        ))}
-      </ScrollArea>
+      <div className="flex-1 min-h-0 w-full flex gap-1 relative">
+        <nav
+          ref={navRef}
+          className="flex flex-col items-center pt-3 gap-3 w-6 flex-shrink-0 overflow-y-auto cursor-grab active:cursor-grabbing [&::-webkit-scrollbar]:hidden [scrollbar-width:none] self-center max-h-[40%]"
+          onMouseDown={e => {
+            dragRef.current = { startY: e.clientY, scrollTop: navRef.current!.scrollTop }
+          }}
+          onMouseMove={e => {
+            if (!dragRef.current) return
+            const delta = e.clientY - dragRef.current.startY
+            navRef.current!.scrollTop = dragRef.current.scrollTop - delta
+          }}
+          onMouseUp={() => { dragRef.current = null }}
+          onMouseLeave={() => { dragRef.current = null }}
+        >
+          {messages.filter(m => m.role === 'user').map(msg => (
+            <span
+              key={msg.id}
+              className="flex-shrink-0 w-2 h-2 rounded-full bg-muted-foreground/30 hover:bg-muted-foreground transition-colors cursor-pointer"
+              onClick={() => document.getElementById(`msg-${msg.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              onMouseEnter={e => setTooltip({ text: msg.text, x: e.clientX + 8, y: e.clientY })}
+              onMouseMove={e => setTooltip(t => t ? { ...t, x: e.clientX + 8, y: e.clientY } : null)}
+              onMouseLeave={() => setTooltip(null)}
+            />
+          ))}
+        </nav>
+        <div className="flex-1 h-full border rounded-lg overflow-y-auto min-w-0" ref={scrollRef}>
+          <div className="p-4">
+            {messages.length === 0 && (
+              <p className="text-center text-muted-foreground mt-20">
+                输入消息开始对话
+              </p>
+            )}
+            {messages.map(msg => (
+              <MessageItem key={msg.id} message={msg} isStreaming={isLoading} agents={agents} />
+            ))}
+          </div>
+        </div>
+        <button
+            ref={scrollBtnRef}
+            style={{ display: 'none' }}
+            onClick={scrollToBottom}
+            className="absolute bottom-3 right-3 z-10 bg-primary text-primary-foreground rounded-full w-8 h-8 flex items-center justify-center shadow-md hover:opacity-90 transition-opacity text-sm"
+          >
+            ↓
+          </button>
+      </div>
+      {sessionStatus && sessionStatus.type !== 'idle' && (
+        <div className="flex items-center gap-2 px-3 py-1.5 text-xs border rounded-md bg-muted/50 text-muted-foreground mb-2">
+          {sessionStatus.type === 'busy' && (
+            <><span className="animate-pulse">⚡</span> 模型思考中...</>
+          )}
+          {sessionStatus.type === 'retry' && (
+            <><span>⚠️</span> 重试中 ({sessionStatus.attempt}/{sessionStatus.next}){sessionStatus.message && <span className="ml-1 text-[11px]">— {sessionStatus.message}</span>}</>
+          )}
+        </div>
+      )}
+      {questions.map(q => (
+        <QuestionCard key={q.id} id={q.id} questions={q.questions} onReply={replyQuestion} onReject={rejectQuestion} />
+      ))}
       {permissions.map(p => (
         <PermissionCard key={p.id} id={p.id} action={p.action} resources={p.resources} onReply={replyPermission} />
       ))}
@@ -191,7 +278,7 @@ export default function ChatView({ onOpenSidebar, sessionId, onNewSession, initi
               {weknoraError ? '⚠ 重试' : kbLabel}
             </button>
             {kbOpen && (
-              <div className="absolute bottom-full mb-1 left-0 bg-popover border rounded-md shadow-lg z-50 min-w-[180px] max-h-[260px] overflow-y-auto p-1">
+              <div className="absolute bottom-full mb-1 left-0 bg-white border rounded-md shadow-lg z-50 min-w-[180px] max-h-[260px] overflow-y-auto p-1">
                 {weknoraLoading ? (
                   <div className="px-2 py-1 text-xs text-muted-foreground">加载中...</div>
                 ) : weknoraError ? (
@@ -292,6 +379,14 @@ export default function ChatView({ onOpenSidebar, sessionId, onNewSession, initi
         </div>
       </div>
       <InputBar onSend={handleSend} disabled={isLoading} onStop={abort} />
+      {tooltip && (
+        <div
+          className="fixed z-50 text-xs text-gray-900 bg-white border rounded-md px-2.5 py-1.5 shadow-md pointer-events-none max-w-[260px] truncate"
+          style={{ left: tooltip.x, top: tooltip.y }}
+        >
+          {tooltip.text}
+        </div>
+      )}
     </div>
   )
 }

@@ -33,6 +33,7 @@ code({ className, children, ...props }) {
   const lang = className?.replace('language-', '')
   const code = String(children).replace(/\n$/, '')
   if (lang) return <CodeBlock language={lang} code={code} />
+  if (code.includes('\n')) return <CodeBlock code={code} />  // 多行无标注 → CodeBlock
   return <code className="text-sm bg-muted/50 px-1 rounded">{children}</code>
 }
 ```
@@ -126,3 +127,52 @@ const adjustHeight = () => {
   el.style.height = el.scrollHeight + 'px'
 }
 ```
+
+## 消息内容样式（message-content）
+
+正文 markdown 渲染后各元素的间距和排版由 `globals.css` 中的 `.message-content` 规则统一控制。
+
+### 背景
+
+- `whitespace-pre-wrap` 导致 markdown 源文本的 `\n` 被保留，段落间多一个换行
+- 解决：`ReactMarkdown` 外层包 `<div className="whitespace-normal">`，阻断空白继承
+- `.message-content` 的 `margin` 统一用 `globals.css` 控制（不通过内联 `<style>`，避免 HMR 失效）
+
+### CSS 规则（globals.css）
+
+```css
+.message-content p,
+.message-content hr,
+.message-content blockquote,
+.message-content pre {
+  margin: 0.25em 0;
+}
+
+.message-content h1 { font-size: 1.35em; font-weight: 700; margin: 0.6em 0 0.25em; }
+.message-content h2 { font-size: 1.2em;  font-weight: 600; margin: 0.5em 0 0.2em; }
+.message-content h3 { font-size: 1.1em;  font-weight: 600; margin: 0.4em 0 0.15em; }
+.message-content h4,
+.message-content h5,
+.message-content h6 { font-size: 1em;   font-weight: 600; margin: 0.3em 0 0.1em; }
+
+.message-content ul {
+  list-style-type: disc;
+  padding-inline-start: 1.5em;
+  margin: 0;
+}
+.message-content ol {
+  list-style-type: decimal;
+  padding-inline-start: 1.5em;
+  margin: 0;
+}
+.message-content li {
+  margin: 0;
+}
+```
+
+### 文件变更
+
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| `src/renderer/src/globals.css` | 追加 | `.message-content` 系列规则 |
+| `src/renderer/src/components/MessageItem.tsx` | 修改 | `ReactMarkdown` 外层包 `whitespace-normal` |

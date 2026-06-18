@@ -4,8 +4,13 @@ let cleanupStream: (() => void) | null = null
 let cleanupEnd: (() => void) | null = null
 let cleanupError: (() => void) | null = null
 let cleanupTool: (() => void) | null = null
+let cleanupFile: (() => void) | null = null
+let cleanupSubtask: (() => void) | null = null
+let cleanupStepFinish: (() => void) | null = null
 let cleanupStatus: (() => void) | null = null
 let cleanupPermission: (() => void) | null = null
+let cleanupQuestion: (() => void) | null = null
+let cleanupSessionStatus: (() => void) | null = null
 
 const api = {
   listSessions: () => ipcRenderer.invoke('list-sessions'),
@@ -25,6 +30,7 @@ const api = {
   getWorkspacePath: () => ipcRenderer.invoke('get-workspace-path'),
   setWorkspacePath: () => ipcRenderer.invoke('set-workspace-path'),
   openWorkspaceFolder: () => ipcRenderer.invoke('open-workspace-folder'),
+  openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
   loadAgents: () => ipcRenderer.invoke('load-agents'),
   saveAgents: (agents: any[]) => ipcRenderer.invoke('save-agents', agents),
   loadMcp: () => ipcRenderer.invoke('load-mcp'),
@@ -57,6 +63,24 @@ const api = {
     ipcRenderer.on('stream-tool', handler)
     cleanupTool = () => ipcRenderer.removeListener('stream-tool', handler)
   },
+  onFile: (callback: (data: { id: string; mediaType: string; filename: string; url: string }) => void) => {
+    if (cleanupFile) cleanupFile()
+    const handler = (_event: any, data: any) => callback(data)
+    ipcRenderer.on('stream-file', handler)
+    cleanupFile = () => ipcRenderer.removeListener('stream-file', handler)
+  },
+  onSubtask: (callback: (data: { id: string; description: string; agent: string; prompt: string }) => void) => {
+    if (cleanupSubtask) cleanupSubtask()
+    const handler = (_event: any, data: any) => callback(data)
+    ipcRenderer.on('stream-subtask', handler)
+    cleanupSubtask = () => ipcRenderer.removeListener('stream-subtask', handler)
+  },
+  onStepFinish: (callback: (data: { id: string; reason: string; cost: number; tokens: any }) => void) => {
+    if (cleanupStepFinish) cleanupStepFinish()
+    const handler = (_event: any, data: any) => callback(data)
+    ipcRenderer.on('stream-step-finish', handler)
+    cleanupStepFinish = () => ipcRenderer.removeListener('stream-step-finish', handler)
+  },
   onConnectionStatus: (callback: (status: string) => void) => {
     if (cleanupStatus) cleanupStatus()
     const handler = (_event: any, status: any) => callback(status)
@@ -71,6 +95,24 @@ const api = {
     const handler = (_event: any, data: any) => callback(data)
     ipcRenderer.on('stream-permission', handler)
     cleanupPermission = () => ipcRenderer.removeListener('stream-permission', handler)
+  },
+  replyQuestion: (id: string, text: string) => {
+    ipcRenderer.invoke('reply-question', id, text)
+  },
+  rejectQuestion: (id: string) => {
+    ipcRenderer.invoke('reject-question', id)
+  },
+  onQuestion: (callback: (data: { id: string; questions: { question: string; header: string; options: { label: string; description: string }[]; custom: boolean; multiple: boolean }[] }) => void) => {
+    if (cleanupQuestion) cleanupQuestion()
+    const handler = (_event: any, data: any) => callback(data)
+    ipcRenderer.on('stream-question', handler)
+    cleanupQuestion = () => ipcRenderer.removeListener('stream-question', handler)
+  },
+  onSessionStatus: (callback: (data: { sessionID: string; status: { type: string; attempt?: number; message?: string; next?: number } }) => void) => {
+    if (cleanupSessionStatus) cleanupSessionStatus()
+    const handler = (_event: any, data: any) => callback(data)
+    ipcRenderer.on('stream-session-status', handler)
+    cleanupSessionStatus = () => ipcRenderer.removeListener('stream-session-status', handler)
   },
 }
 
